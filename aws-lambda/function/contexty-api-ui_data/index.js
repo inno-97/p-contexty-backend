@@ -11,78 +11,134 @@ const pool = new pg.Pool({
 const limit = 15;
 
 function defaultRandomQuery(did = '') {
-	return `
-		  select 
-			  d.did,
-			  d.copyCount,
-			  d.text,
-			  max(d.timestamp) as timestamp,
-			  array_to_json(array_agg(ct))
-		  from (
-			  select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud 
-			  inner join ct_ui_data_text cudt on cud.did = cudt.did ${
-					(did !== '' &&
-						`where cud.did not in (
-				  ${did}
-			  )`) ||
-					''
-				}
-			  order by random() limit ${limit}
-			  ) as d
-		  inner join ct_rel_data_tag crdt on crdt.did = d.did 
-		  inner join ct_tag ct on ct.tid = crdt.tid
-		  group by d.did, d.copyCount, d.text
-	  `;
+	const value = [];
+	let num = 1;
+	const query = `
+	select 
+	  d.did,
+	  d.copyCount,
+	  d.text,
+	  max(d.timestamp) as timestamp,
+	  array_to_json(array_agg(ct))
+	from (
+	  select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud 
+	  inner join ct_ui_data_text cudt on cud.did = cudt.did ${
+			(did !== '' &&
+				`where cud.did not in (
+			${did
+				.split(',')
+				.map((item, idx) => {
+					value.push(item);
+					return `${idx !== 0 ? ',' : ''} $${num++}`;
+				})
+				.join('')}
+	  )`) ||
+			''
+		}
+	  order by random() limit $${num++}
+	  ) as d
+	inner join ct_rel_data_tag crdt on crdt.did = d.did 
+	inner join ct_tag ct on ct.tid = crdt.tid
+	group by d.did, d.copyCount, d.text
+  `;
+
+	value.push(limit);
+	return {
+		query: query,
+		value: value,
+	};
 }
 
 function defaultRandomTotalQuery() {
-	return `
-		  select count(1) from ct_ui_data
-	  `;
+	const query = `
+			select count(1) from ct_ui_data
+		`;
+
+	return {
+		query: query,
+		value: [],
+	};
 }
 
 function conditionQuery(page = 0, q = '', f = []) {
-	return `
-	  select 
-	  target.did, target.copyCount, target.text,
-	  max(target.timestamp) as timestamp,
-	  array_to_json(array_agg(ct))
-	from (
-	  select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud
-	  inner join ct_ui_data_text cudt on cud.did = cudt.did
-	  where 1=1 ${(q !== '' && ` and cudt.text like '%${q}%'`) || ''} ${f
+	const value = [];
+
+	let num = 1;
+
+	if (q !== '') {
+		value.push(`%${q}%`);
+	}
+
+	const query = `
+	select 
+	target.did, target.copyCount, target.text,
+	max(target.timestamp) as timestamp,
+	array_to_json(array_agg(ct))
+  from (
+	select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud
+	inner join ct_ui_data_text cudt on cud.did = cudt.did
+	where 1=1 ${(q !== '' && ` and cudt.text like $${num++}`) || ''} ${f
 		.map((item) => {
 			return `
-		and exists (
-			  select 1 from ct_rel_data_tag tag
-			  where tag.did = cud.did
-			  and tag.tid in ( ${item} )
-		  )`;
+	and exists (
+		select 1 from ct_rel_data_tag tag
+		where tag.did = cud.did
+		and tag.tid in ( ${item
+			.map((tid, idx) => {
+				value.push(tid);
+				return `${idx !== 0 ? ',' : ''} $${num++}`;
+			})
+			.join('')} )
+	  )`;
 		})
 		.join('')}
-	  order by cud.copyCount, cud.did
-	  limit ${limit} offset ${page * limit} -- paging
-	) as target
-	  inner join ct_rel_data_tag crdt on target.did = crdt.did
-	  inner join ct_tag ct on crdt.tid = ct.tid
-	  group by target.did, target.copyCount, target.text
-		`;
+	order by cud.copyCount, cud.did
+	limit $${num++} offset $${num++} -- paging
+  ) as target
+	inner join ct_rel_data_tag crdt on target.did = crdt.did
+	inner join ct_tag ct on crdt.tid = ct.tid
+	group by target.did, target.copyCount, target.text
+	`;
+
+	value.push(limit, page * limit);
+
+	return {
+		query: query,
+		value: value,
+	};
 }
 
 function conditionTotalQuery(q = '', f = []) {
-	return `
-		select count(1) from ct_ui_data cud
-		inner join ct_ui_data_text cudt on cud.did = cudt.did
-		where 1=1 ${(q !== '' && ` and cudt.text like '%${q}%'`) || ''} ${f
+	const value = [];
+	let num = 1;
+
+	if (q !== '') {
+		value.push(`%${q}%`);
+	}
+
+	const query = `
+	select count(1) from ct_ui_data cud
+	inner join ct_ui_data_text cudt on cud.did = cudt.did
+	where 1=1 ${(q !== '' && ` and cudt.text like $${num++} `) || ''} ${f
 		.map((item) => {
 			return `and exists (
-			  select 1 from ct_rel_data_tag tag
-			  where tag.did = cud.did
-			  and tag.tid in (${item})
-		  )`;
+		select 1 from ct_rel_data_tag tag
+		where tag.did = cud.did
+		and tag.tid in ( ${item
+			.map((tid, idx) => {
+				value.push(tid);
+				return `${idx !== 0 ? ',' : ''}$${num++}`;
+			})
+			.join('')} )
+	  )`;
 		})
 		.join('')}
-		`;
+	`;
+
+	return {
+		query: query,
+		value: value,
+	};
 }
 
 function getTags(db_json) {
@@ -153,7 +209,7 @@ exports.handler = async (event, context, callback) => {
 		}
 
 		// select get data query
-		const get_query_res = await client.query(getQuery);
+		const get_query_res = await client.query(getQuery.query, getQuery.value);
 		const data = get_query_res.rows.map((item) => {
 			return {
 				id: item.did,
@@ -165,7 +221,7 @@ exports.handler = async (event, context, callback) => {
 		});
 
 		// select get total count query
-		const total_query_res = await client.query(totalQuery);
+		const total_query_res = await client.query(totalQuery.query, totalQuery.value);
 		const totalCount = total_query_res.rows[0].count;
 		const totalPage = Math.ceil(totalCount / limit);
 
