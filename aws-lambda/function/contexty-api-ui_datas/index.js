@@ -186,9 +186,8 @@ exports.handler = async (event, context, callback) => {
 		for (let tag of ['c:', 's:', 'e:']) {
 			const value = tagList
 				.filter((item) => item.slice(0, 2) === tag)
-				.map((item) => item.slice(2))
-				.join();
-			if (value !== '') {
+				.map((item) => item.slice(2));
+			if (value.length !== 0) {
 				filterTags.push(value);
 			}
 		}
