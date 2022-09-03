@@ -70,6 +70,7 @@ exports.handler = async (event, context, callback) => {
 				statusCode: 200,
 				body: JSON.stringify({
 					id: ui_data.did,
+					image: ui_data.image,
 					copyCount: ui_data.copycount,
 					text: ui_data.text,
 					timestamp: ui_data.timestamp.getTime(),
