@@ -9,7 +9,6 @@ const pool = new pg.Pool({
 });
 
 const limit = 15;
-
 function defaultRandomQuery(did = '') {
 	const value = [];
 	let num = 1;
@@ -92,12 +91,13 @@ function conditionQuery(page = 0, q = '', f = []) {
 	  )`;
 		})
 		.join('')}
-	order by cud.copyCount, cud.did
+	order by cud.copyCount desc, cud.timestamp, cud.did
 	limit $${num++} offset $${num++} -- paging
   ) as target
 	inner join ct_rel_data_tag crdt on target.did = crdt.did
 	inner join ct_tag ct on crdt.tid = ct.tid
 	group by target.did, target.copyCount, target.text
+	order by target.copyCount desc, timestamp, target.did
 	`;
 
 	value.push(limit, page * limit);
@@ -164,7 +164,7 @@ function getTags(db_json) {
 
 exports.handler = async (event, context, callback) => {
 	const { p = '', q = '', t = '', ri = '' } = event.queryStringParameters ?? {};
-	let default_mode = false;
+	// let default_mode = false;
 
 	let res = {
 		statusCode: 500,
@@ -175,9 +175,9 @@ exports.handler = async (event, context, callback) => {
 		page = parseInt(p) - 1;
 	}
 
-	if (q === '' && t === '') {
-		default_mode = true;
-	}
+	// if (q === '' && t === '') {
+	// 	default_mode = true;
+	// }
 
 	let filterTags = [];
 	if (t !== '') {
@@ -199,13 +199,13 @@ exports.handler = async (event, context, callback) => {
 		let getQuery = null;
 		let totalQuery = null;
 
-		if (default_mode) {
-			getQuery = defaultRandomQuery(ri);
-			totalQuery = defaultRandomTotalQuery();
-		} else {
-			getQuery = conditionQuery(page, q, filterTags);
-			totalQuery = conditionTotalQuery(q, filterTags);
-		}
+		// if (default_mode) {
+		// 	getQuery = defaultRandomQuery(ri);
+		// 	totalQuery = defaultRandomTotalQuery();
+		// } else {
+		getQuery = conditionQuery(page, q, filterTags);
+		totalQuery = conditionTotalQuery(q, filterTags);
+		// }
 
 		// select get data query
 		const get_query_res = await client.query(getQuery.query, getQuery.value);
