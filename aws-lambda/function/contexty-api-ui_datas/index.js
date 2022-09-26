@@ -91,13 +91,13 @@ function conditionQuery(page = 0, q = '', f = []) {
 	  )`;
 		})
 		.join('')}
-	order by cud.copyCount desc, cud.timestamp, cud.did
+	order by cud.copyCount desc, cud.timestamp desc, cud.did
 	limit $${num++} offset $${num++} -- paging
   ) as target
 	inner join ct_rel_data_tag crdt on target.did = crdt.did
 	inner join ct_tag ct on crdt.tid = ct.tid
 	group by target.did, target.copyCount, target.text
-	order by target.copyCount desc, timestamp, target.did
+	order by target.copyCount desc, timestamp desc, target.did
 	`;
 
 	value.push(limit, page * limit);
