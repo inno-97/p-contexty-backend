@@ -42,8 +42,6 @@ exports.handler = async (event, context, callback) => {
 				{
 					type: 'JWT',
 					uuid: account.uuid,
-					uid: account.uid,
-					name: account.name,
 					auth: account.auth,
 				},
 				process.env.SECRET_KEY,
@@ -72,6 +70,7 @@ exports.handler = async (event, context, callback) => {
 				headers: {
 					'Access-Control-Allow-Origin': 'https://contexty.kr',
 					'Access-Control-Allow-Credentials': true,
+					Authorization: token,
 					'Set-Cookie': cookieString,
 				},
 			};
