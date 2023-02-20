@@ -17,11 +17,12 @@ function defaultRandomQuery(did = '') {
 	  d.did,
 	  d.copyCount,
 	  d.text,
+	  d.image,
 	  max(d.timestamp) as timestamp,
 	  array_to_json(array_agg(ct))
 	from (
-	  select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud 
-	  inner join ct_ui_data_text cudt on cud.did = cudt.did ${
+	  select cud.did, cud.copyCount, cud.image, cudt.text, cud.timestamp from ct_ui_data cud 
+	  inner join ct_ui_data_text cudt on cud.deploy = true and cud.did = cudt.did ${
 			(did !== '' &&
 				`where cud.did not in (
 			${did
@@ -38,7 +39,7 @@ function defaultRandomQuery(did = '') {
 	  ) as d
 	inner join ct_rel_data_tag crdt on crdt.did = d.did 
 	inner join ct_tag ct on ct.tid = crdt.tid
-	group by d.did, d.copyCount, d.text
+	group by d.did, d.copyCount, d.image, d.text
   `;
 
 	value.push(limit);
@@ -50,7 +51,7 @@ function defaultRandomQuery(did = '') {
 
 function defaultRandomTotalQuery() {
 	const query = `
-			select count(1) from ct_ui_data
+			select count(1) from ct_ui_data where deploy = true
 		`;
 
 	return {
@@ -70,12 +71,12 @@ function conditionQuery(page = 0, q = '', f = []) {
 
 	const query = `
 	select 
-	target.did, target.copyCount, target.text,
+	target.did, target.copyCount, target.image, target.text,
 	max(target.timestamp) as timestamp,
 	array_to_json(array_agg(ct))
   from (
-	select cud.did, cud.copyCount, cudt.text, cud.timestamp from ct_ui_data cud
-	inner join ct_ui_data_text cudt on cud.did = cudt.did
+	select cud.did, cud.copyCount, cud.image, cudt.text, cud.timestamp from ct_ui_data cud
+	inner join ct_ui_data_text cudt on cud.deploy = true and cud.did = cudt.did
 	where 1=1 ${(q !== '' && ` and cudt.text like $${num++}`) || ''} ${f
 		.map((item) => {
 			return `
@@ -96,7 +97,7 @@ function conditionQuery(page = 0, q = '', f = []) {
   ) as target
 	inner join ct_rel_data_tag crdt on target.did = crdt.did
 	inner join ct_tag ct on crdt.tid = ct.tid
-	group by target.did, target.copyCount, target.text
+	group by target.did, target.copyCount, target.image, target.text
 	order by target.copyCount desc, timestamp desc, target.did
 	`;
 
@@ -118,7 +119,7 @@ function conditionTotalQuery(q = '', f = []) {
 
 	const query = `
 	select count(1) from ct_ui_data cud
-	inner join ct_ui_data_text cudt on cud.did = cudt.did
+	inner join ct_ui_data_text cudt on cud.deploy = true and cud.did = cudt.did
 	where 1=1 ${(q !== '' && ` and cudt.text like $${num++} `) || ''} ${f
 		.map((item) => {
 			return `and exists (
@@ -214,6 +215,7 @@ exports.handler = async (event, context, callback) => {
 				id: item.did,
 				copyCount: item.copycount,
 				text: item.text,
+				image: item.image,
 				timestamp: item.timestamp.getTime(),
 				tags: getTags(item.array_to_json),
 			};
