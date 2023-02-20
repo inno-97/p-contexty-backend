@@ -2,27 +2,27 @@ const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = process.env.SECRET_KEY;
 
-// function getCookiesFromHeader(headers) {
-// 	if (headers === null || headers === undefined || headers.cookie === undefined) {
-// 		return {};
-// 	}
+function getCookiesFromHeader(headers) {
+	if (headers === null || headers === undefined || headers.cookie === undefined) {
+		return {};
+	}
 
-// 	// Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
-// 	var list = {},
-// 		rc = headers.cookie;
+	// Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
+	var list = {},
+		rc = headers.cookie;
 
-// 	rc &&
-// 		rc.split(';').forEach(function (cookie) {
-// 			var parts = cookie.split('=');
-// 			var key = parts.shift().trim();
-// 			var value = decodeURI(parts.join('='));
-// 			if (key != '') {
-// 				list[key] = value;
-// 			}
-// 		});
+	rc &&
+		rc.split(';').forEach(function (cookie) {
+			var parts = cookie.split('=');
+			var key = parts.shift().trim();
+			var value = decodeURI(parts.join('='));
+			if (key != '') {
+				list[key] = value;
+			}
+		});
 
-// 	return list;
-// }
+	return list;
+}
 
 function verifyToken(token) {
 	let decoded;
@@ -43,19 +43,21 @@ function verifyToken(token) {
 }
 
 exports.handler = async (event) => {
-	// const cookies = getCookiesFromHeader(event.headers);
+	const cookies = getCookiesFromHeader(event.headers);
 
 	let response = {
 		isAuthorized: false,
 	};
 
-	const jwt_decode = verifyToken(event.headers.authorization);
+	const jwt_decode = verifyToken(cookies.ctt_jwt);
 
 	if (jwt_decode !== null) {
 		response = {
 			isAuthorized: true,
 			context: {
 				uuid: jwt_decode.uuid,
+				uid: jwt_decode.uid,
+				name: jwt_decode.name,
 				auth: jwt_decode.auth,
 			},
 		};
