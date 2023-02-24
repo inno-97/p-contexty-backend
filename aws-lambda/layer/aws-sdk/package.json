@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "aws-sdk": "^2.1320.0",
+    "bluebird": "^3.7.2",
+    "parse-multipart": "^1.0.4"
+  }
+}
