@@ -17,6 +17,7 @@ function getTags(db_json) {
 		const data = {
 			id: db_json[i].tid,
 			name: db_json[i].name,
+			type: db_json[i].type,
 		};
 
 		if (Array.isArray(tags[tagType + 's'])) {
