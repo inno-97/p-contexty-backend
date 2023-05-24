@@ -223,7 +223,7 @@ exports.handler = async (event, context, callback) => {
 
 		// select get total count query
 		const total_query_res = await client.query(totalQuery.query, totalQuery.value);
-		const totalCount = total_query_res.rows[0].count;
+		const totalCount = parseInt(total_query_res.rows[0].count);
 		const totalPage = Math.ceil(totalCount / limit);
 
 		// TODO implement
