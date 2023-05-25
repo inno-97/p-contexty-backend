@@ -8,59 +8,7 @@ const pool = new pg.Pool({
 	port: process.env.DB_PORT,
 });
 
-const limit = 15;
-function defaultRandomQuery(did = '') {
-	const value = [];
-	let num = 1;
-	const query = `
-	select 
-	  d.did,
-	  d.copyCount,
-	  d.text,
-	  d.image,
-	  max(d.timestamp) as timestamp,
-	  array_to_json(array_agg(ct))
-	from (
-	  select cud.did, cud.copyCount, cud.image, cudt.text, cud.timestamp from ct_ui_data cud 
-	  inner join ct_ui_data_text cudt on cud.deploy = true and cud.did = cudt.did ${
-			(did !== '' &&
-				`where cud.did not in (
-			${did
-				.split(',')
-				.map((item, idx) => {
-					value.push(item);
-					return `${idx !== 0 ? ',' : ''} $${num++}`;
-				})
-				.join('')}
-	  )`) ||
-			''
-		}
-	  order by random() limit $${num++}
-	  ) as d
-	inner join ct_rel_data_tag crdt on crdt.did = d.did 
-	inner join ct_tag ct on ct.tid = crdt.tid
-	group by d.did, d.copyCount, d.image, d.text
-  `;
-
-	value.push(limit);
-	return {
-		query: query,
-		value: value,
-	};
-}
-
-function defaultRandomTotalQuery() {
-	const query = `
-			select count(1) from ct_ui_data where deploy = true
-		`;
-
-	return {
-		query: query,
-		value: [],
-	};
-}
-
-function conditionQuery(page = 0, q = '', f = []) {
+function conditionQuery(limit = 15, page = 0, q = '', f = []) {
 	const value = [];
 
 	let num = 1;
@@ -164,8 +112,7 @@ function getTags(db_json) {
 }
 
 exports.handler = async (event, context, callback) => {
-	const { p = '', q = '', t = '', ri = '' } = event.queryStringParameters ?? {};
-	// let default_mode = false;
+	const { pp = '', p = '', q = '', t = '' } = event.queryStringParameters ?? {};
 
 	let res = {
 		statusCode: 500,
@@ -176,9 +123,10 @@ exports.handler = async (event, context, callback) => {
 		page = parseInt(p) - 1;
 	}
 
-	// if (q === '' && t === '') {
-	// 	default_mode = true;
-	// }
+	let rowsPerPage = 15;
+	if (pp !== '' && !isNaN(pp)) {
+		rowsPerPage = parseInt(pp);
+	}
 
 	let filterTags = [];
 	if (t !== '') {
@@ -200,13 +148,8 @@ exports.handler = async (event, context, callback) => {
 		let getQuery = null;
 		let totalQuery = null;
 
-		// if (default_mode) {
-		// 	getQuery = defaultRandomQuery(ri);
-		// 	totalQuery = defaultRandomTotalQuery();
-		// } else {
-		getQuery = conditionQuery(page, q, filterTags);
+		getQuery = conditionQuery(rowsPerPage, page, q, filterTags);
 		totalQuery = conditionTotalQuery(q, filterTags);
-		// }
 
 		// select get data query
 		const get_query_res = await client.query(getQuery.query, getQuery.value);
@@ -224,13 +167,14 @@ exports.handler = async (event, context, callback) => {
 		// select get total count query
 		const total_query_res = await client.query(totalQuery.query, totalQuery.value);
 		const totalCount = parseInt(total_query_res.rows[0].count);
-		const totalPage = Math.ceil(totalCount / limit);
+		const totalPage = Math.ceil(totalCount / rowsPerPage);
 
 		// TODO implement
 		res = {
 			statusCode: 200,
 			body: JSON.stringify({
 				datas: data,
+				rowsPerPage: rowsPerPage,
 				totalPage: totalPage,
 				totalCount: totalCount,
 			}),
