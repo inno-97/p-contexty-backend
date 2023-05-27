@@ -1,4 +1,15 @@
+const AWS = require('aws-sdk');
 const pg = require('pg');
+
+const parser = require('lambda-multipart-parser');
+
+AWS.config.update({
+	region: 'ap-northeast-2',
+});
+
+const s3 = new AWS.S3();
+const AWS_BUCKET = 'contexty-s3';
+const rootPath = 'image/ui-data';
 
 const pool = new pg.Pool({
 	user: process.env.DB_USER,
@@ -12,12 +23,17 @@ exports.handler = async (event) => {
 	const result = [];
 
 	const uuid = event.requestContext.authorizer.lambda.uuid;
-	let { datas = [], deploy = true } = JSON.parse(event.body);
+
+	const bodyParser = await parser.parse(event);
+	const imageFiles = bodyParser.files;
+	const datas = bodyParser?.datas === undefined ? [] : JSON.parse(bodyParser.datas);
+
+	// const deploy = true
 
 	/**
 	 * 우선 Deploy 기준으로 먼저
 	 */
-	// {validation: boolean, image: 'new' | 'exists' | null, create: boolean, error: Error}
+	// {validation: boolean, image: 'undefined' | 'exists' | null, create: boolean, error: Error}
 	const client = await pool.connect();
 
 	for (let i = 0; i < datas.length; i++) {
@@ -31,14 +47,38 @@ exports.handler = async (event) => {
 			continue;
 		}
 
-		data.image = `${data.tags.service.name}/${data.image}`;
+		let imageFile = null;
+		for (let fi = 0; fi < imageFiles.length; fi++) {
+			if (imageFiles[fi].filename === data.image) {
+				imageFile = imageFiles[fi];
+				imageFiles.splice(fi, 1);
+				break;
+			}
+		}
 
+		if (imageFile === null) {
+			state.image = 'undefined';
+			continue;
+		}
+
+		data.image = `${data.tags.service.name}/${data.image}`;
 		try {
-			state.image = (await existsImage(client, data.image)) ? 'exists' : 'new';
+			state.image = (await existsImage(client, data.image)) ? 'exists' : true;
 			if (state.image === 'exists') {
 				continue;
 			}
 			const test = await addUIData(client, uuid, data);
+
+			const buffer = imageFile.content;
+			const fileFullName = `${rootPath}/${data.image}`;
+
+			const uploadParams = {
+				Bucket: AWS_BUCKET,
+				Key: fileFullName,
+				Body: buffer,
+			};
+
+			await s3.upload(uploadParams).promise();
 
 			// create data
 			state.create = test;
